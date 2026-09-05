@@ -22,10 +22,7 @@ app.use(express.json());
 
 app.use(cookieParser());
 
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://rahmania-jame-mosjid.netlify.app",
-];
+const allowedOrigins = ["https://rahmania-jame-mosjid.netlify.app"];
 
 app.use(
   cors({
