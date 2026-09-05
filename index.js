@@ -22,7 +22,10 @@ app.use(express.json());
 
 app.use(cookieParser());
 
-const allowedOrigins = ["http://localhost:5173"];
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://visionary-dieffenbachia-32abe5.netlify.app",
+];
 
 app.use(
   cors({
