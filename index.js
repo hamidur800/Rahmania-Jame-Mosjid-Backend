@@ -306,45 +306,109 @@ async function run() {
       try {
         const user = req.body;
 
+        // ==========================================
+        // EMAIL REQUIRED
+        // ==========================================
         if (!user?.email) {
           return res.status(400).send({
             message: "Email is required",
           });
         }
 
-        // Firebase user-এর email আর body email একই কিনা check
+        // ==========================================
+        // FIREBASE EMAIL & BODY EMAIL MUST MATCH
+        // ==========================================
         if (req.user.email !== user.email) {
           return res.status(403).send({
             message: "Email does not match authenticated user",
           });
         }
 
+        // ==========================================
+        // NAME REQUIRED
+        // ==========================================
+        if (!user?.name || !user.name.trim()) {
+          return res.status(400).send({
+            message: "Name is required",
+          });
+        }
+
+        // ==========================================
+        // PHONE IS 100% REQUIRED
+        // ==========================================
+        if (!user?.phone || !user.phone.trim()) {
+          return res.status(400).send({
+            message:
+              "Phone number is required. Registration cannot be completed without phone number.",
+          });
+        }
+
+        // ==========================================
+        // CLEAN PHONE NUMBER
+        // ==========================================
+        const phone = user.phone.replace(/\s+/g, "");
+
+        // ==========================================
+        // BANGLADESH PHONE VALIDATION
+        // 01XXXXXXXXX
+        // +8801XXXXXXXXX
+        // ==========================================
+        const phoneRegex = /^(01[3-9]\d{8}|\+8801[3-9]\d{8})$/;
+
+        if (!phoneRegex.test(phone)) {
+          return res.status(400).send({
+            message: "Invalid Bangladesh phone number. Example: 01650053800",
+          });
+        }
+
+        // ==========================================
+        // CHECK EXISTING USER
+        // ==========================================
         const existingUser = await usersCollection.findOne({
           email: user.email,
         });
 
-        // User already exists
+        // ==========================================
+        // USER ALREADY EXISTS
+        // ==========================================
         if (existingUser) {
-          return res.send({
+          return res.status(409).send({
             message: "User already exists",
             insertedId: null,
           });
         }
 
+        // ==========================================
+        // FINAL USER DATA
+        // ==========================================
         const newUser = {
-          name: user.name || "Unknown User",
+          name: user.name.trim(),
           email: user.email,
-          phone: user.phone || "",
+          phone: phone,
           photoURL: user.photoURL || "",
           role: "user",
           status: "Active",
           monthlyFee: Number(user.monthlyFee) || 100,
+          authProvider: user.authProvider || "password",
           createdAt: new Date(),
         };
 
+        // ==========================================
+        // INSERT USER
+        // ==========================================
         const result = await usersCollection.insertOne(newUser);
 
-        res.send(result);
+        console.log("New user created:", {
+          email: newUser.email,
+          phone: newUser.phone,
+          authProvider: newUser.authProvider,
+        });
+
+        res.status(201).send({
+          success: true,
+          message: "User created successfully",
+          insertedId: result.insertedId,
+        });
       } catch (error) {
         console.error("POST USER ERROR:", error);
 
