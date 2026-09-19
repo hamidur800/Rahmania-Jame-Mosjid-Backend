@@ -271,12 +271,34 @@ async function run() {
       try {
         const email = req.params.email;
 
-        // User শুধু নিজের information দেখতে পারবে
-        if (req.user.email !== email) {
+        // ==========================================
+        // CHECK CURRENT LOGGED-IN USER
+        // ==========================================
+
+        const currentUser = await usersCollection.findOne({
+          email: req.user.email,
+        });
+
+        if (!currentUser) {
+          return res.status(404).send({
+            message: "Current user not found",
+          });
+        }
+
+        // ==========================================
+        // USER CAN SEE ONLY OWN PROFILE
+        // ADMIN CAN SEE ANY USER PROFILE
+        // ==========================================
+
+        if (req.user.email !== email && currentUser.role !== "admin") {
           return res.status(403).send({
             message: "Forbidden access",
           });
         }
+
+        // ==========================================
+        // GET TARGET USER
+        // ==========================================
 
         const user = await usersCollection.findOne({
           email: email,
@@ -501,21 +523,46 @@ async function run() {
       res.send(users);
     });
 
-    app.get(
-      "/users/:email/payment-history",
-      verifyToken,
-      verifyAdmin,
-      async (req, res) => {
+    app.get("/users/:email/payment-history", verifyToken, async (req, res) => {
+      try {
         const email = req.params.email;
 
-        const payments = await paymentsCollection
-          .find({ email })
-          .sort({ createdAt: -1 })
+        // Current logged-in user check
+        const currentUser = await usersCollection.findOne({
+          email: req.user.email,
+        });
+
+        if (!currentUser) {
+          return res.status(404).send({
+            message: "Current user not found",
+          });
+        }
+
+        // শুধুমাত্র admin অন্য user-এর payment history দেখতে পারবে
+        if (currentUser.role !== "admin") {
+          return res.status(403).send({
+            message: "Only admin can view payment history",
+          });
+        }
+
+        const payments = await donationsCollection
+          .find({
+            email: email,
+          })
+          .sort({
+            createdAt: -1,
+          })
           .toArray();
 
         res.send(payments);
-      },
-    );
+      } catch (error) {
+        console.error("Payment History Error:", error);
+
+        res.status(500).send({
+          message: "Failed to get payment history",
+        });
+      }
+    });
 
     // ========================================
     // PRAYER TIMES
