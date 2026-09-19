@@ -491,6 +491,31 @@ async function run() {
         });
       }
     });
+    // ========================================
+    //  USERS PAYMENT HISTORY
+    // ========================================
+
+    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
+      const users = await usersCollection.find().toArray();
+
+      res.send(users);
+    });
+
+    app.get(
+      "/users/:email/payment-history",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const email = req.params.email;
+
+        const payments = await paymentsCollection
+          .find({ email })
+          .sort({ createdAt: -1 })
+          .toArray();
+
+        res.send(payments);
+      },
+    );
 
     // ========================================
     // PRAYER TIMES
