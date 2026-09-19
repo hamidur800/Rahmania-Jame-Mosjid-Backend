@@ -267,6 +267,59 @@ async function run() {
     // GET CURRENT USER
     // ========================================
 
+    app.get("/users/:email", verifyToken, async (req, res) => {
+      try {
+        const email = req.params.email;
+
+        // ==========================================
+        // CHECK CURRENT LOGGED-IN USER
+        // ==========================================
+
+        const currentUser = await usersCollection.findOne({
+          email: req.user.email,
+        });
+
+        if (!currentUser) {
+          return res.status(404).send({
+            message: "Current user not found",
+          });
+        }
+
+        // ==========================================
+        // USER CAN SEE ONLY OWN PROFILE
+        // ADMIN CAN SEE ANY USER PROFILE
+        // ==========================================
+
+        if (req.user.email !== email && currentUser.role !== "admin") {
+          return res.status(403).send({
+            message: "Forbidden access",
+          });
+        }
+
+        // ==========================================
+        // GET TARGET USER
+        // ==========================================
+
+        const user = await usersCollection.findOne({
+          email: email,
+        });
+
+        if (!user) {
+          return res.status(404).send({
+            message: "User not found",
+          });
+        }
+
+        res.send(user);
+      } catch (error) {
+        console.error("Get User Error:", error);
+
+        res.status(500).send({
+          message: "Failed to get user",
+        });
+      }
+    });
+
     // ========================================
     // POST USER
     // ========================================
