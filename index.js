@@ -668,6 +668,9 @@ async function run() {
         try {
           const updatedPrayerTimes = req.body;
 
+          // ==========================================
+          // 1. Update Prayer Times
+          // ==========================================
           const result = await prayerCollection.updateOne(
             {
               type: "daily",
@@ -684,10 +687,86 @@ async function run() {
             },
           );
 
+          // ==========================================
+          // 2. Get All Users Who Have FCM Token
+          // ==========================================
+          const users = await usersCollection
+            .find({
+              fcmToken: {
+                $exists: true,
+                $ne: "",
+              },
+            })
+            .project({
+              email: 1,
+              fcmToken: 1,
+            })
+            .toArray();
+
+          const tokens = users.map((user) => user.fcmToken).filter(Boolean);
+
+          // ==========================================
+          // 3. Send Notification
+          // ==========================================
+          let notificationResult = {
+            successCount: 0,
+            failureCount: 0,
+          };
+
+          if (tokens.length > 0) {
+            try {
+              const response = await getMessaging().sendEachForMulticast({
+                tokens,
+
+                notification: {
+                  title: "নামাজের সময় আপডেট",
+                  body: "রহমানিয়া জামে মসজিদের নামাজের সময়সূচি আপডেট করা হয়েছে।",
+                },
+
+                data: {
+                  type: "prayer-time-update",
+                  message: "Prayer times have been updated",
+                },
+
+                webpush: {
+                  notification: {
+                    title: "🕌 নামাজের সময় আপডেট",
+                    body: "রহমানিয়া জামে মসজিদের নামাজের সময়সূচি আপডেট করা হয়েছে।",
+                    icon: "https://ibb.co.com/C3Yk4BTn",
+                    badge: "https://rahmania-jame-mosjid.netlify.app/logo.png",
+                  },
+                },
+              });
+
+              notificationResult = {
+                successCount: response.successCount,
+                failureCount: response.failureCount,
+              };
+
+              console.log(
+                `Prayer notification sent: ${response.successCount} successful, ${response.failureCount} failed`,
+              );
+            } catch (notificationError) {
+              console.error("PRAYER NOTIFICATION ERROR:", notificationError);
+            }
+          } else {
+            console.log("No FCM tokens found.");
+          }
+
+          // ==========================================
+          // 4. Send Response
+          // ==========================================
           res.send({
             success: true,
             message: "Prayer times updated successfully",
+
             result,
+
+            notification: {
+              totalTokens: tokens.length,
+              successCount: notificationResult.successCount,
+              failureCount: notificationResult.failureCount,
+            },
           });
         } catch (error) {
           console.error("UPDATE PRAYER TIMES ERROR:", error);
