@@ -108,7 +108,6 @@ async function run() {
         });
       }
     });
-
     // ========================================
     // USERS
     // ========================================
@@ -324,6 +323,9 @@ async function run() {
     // POST USER
     // ========================================
 
+    // =========================================================
+    // CREATE USER
+    // =========================================================
     app.post("/users", verifyToken, async (req, res) => {
       try {
         const user = req.body;
@@ -356,30 +358,27 @@ async function run() {
         }
 
         // ==========================================
-        // PHONE IS 100% REQUIRED
+        // PHONE REQUIRED
         // ==========================================
         if (!user?.phone || !user.phone.trim()) {
           return res.status(400).send({
-            message:
-              "Phone number is required. Registration cannot be completed without phone number.",
+            message: "Phone number is required",
           });
         }
 
         // ==========================================
-        // CLEAN PHONE NUMBER
+        // CLEAN PHONE
         // ==========================================
         const phone = user.phone.replace(/\s+/g, "");
 
         // ==========================================
         // BANGLADESH PHONE VALIDATION
-        // 01XXXXXXXXX
-        // +8801XXXXXXXXX
         // ==========================================
         const phoneRegex = /^(01[3-9]\d{8}|\+8801[3-9]\d{8})$/;
 
         if (!phoneRegex.test(phone)) {
           return res.status(400).send({
-            message: "Invalid Bangladesh phone number. Example: 01650053800",
+            message: "Invalid Bangladesh phone number. Example: 01712345678",
           });
         }
 
@@ -390,9 +389,6 @@ async function run() {
           email: user.email,
         });
 
-        // ==========================================
-        // USER ALREADY EXISTS
-        // ==========================================
         if (existingUser) {
           return res.status(409).send({
             message: "User already exists",
@@ -406,7 +402,7 @@ async function run() {
         const newUser = {
           name: user.name.trim(),
           email: user.email,
-          phone: phone,
+          phone,
           photoURL: user.photoURL || "",
           role: "user",
           status: "Active",
@@ -416,7 +412,7 @@ async function run() {
         };
 
         // ==========================================
-        // INSERT USER
+        // INSERT
         // ==========================================
         const result = await usersCollection.insertOne(newUser);
 
@@ -436,6 +432,44 @@ async function run() {
 
         res.status(500).send({
           message: "Failed to create user",
+        });
+      }
+    });
+
+    // =========================================================
+    // CHECK USER EXISTS BY EMAIL
+    // =========================================================
+    app.get("/users/check/:email", verifyToken, async (req, res) => {
+      try {
+        const email = req.params.email;
+
+        // Firebase authenticated user এবং requested email match করতে হবে
+        if (req.user.email !== email) {
+          return res.status(403).send({
+            message: "Forbidden access",
+          });
+        }
+
+        const user = await usersCollection.findOne({
+          email: email,
+        });
+
+        if (!user) {
+          return res.status(404).send({
+            exists: false,
+            message: "User not found",
+          });
+        }
+
+        res.send({
+          exists: true,
+          user,
+        });
+      } catch (error) {
+        console.error("CHECK USER ERROR:", error);
+
+        res.status(500).send({
+          message: "Failed to check user",
         });
       }
     });
