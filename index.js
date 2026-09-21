@@ -744,10 +744,10 @@ async function run() {
 
                 webpush: {
                   notification: {
-                    title: "🕌 নামাজের সময় আপডেট",
+                    title: "নামাজের সময় আপডেট",
                     body: "রহমানিয়া জামে মসজিদের নামাজের সময়সূচি আপডেট করা হয়েছে।",
-                    icon: "https://ibb.co.com/C3Yk4BTn",
-                    badge: "https://rahmania-jame-mosjid.netlify.app/logo.png",
+                    icon: "https://rahmania-jame-mosjid.netlify.app/logo.jpg",
+                    badge: "https://rahmania-jame-mosjid.netlify.app/logo.jpg",
                   },
                 },
               });
