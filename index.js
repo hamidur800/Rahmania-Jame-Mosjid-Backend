@@ -1,5 +1,6 @@
+import { initializeApp, cert, getApps } from "firebase-admin/app";
+import { getMessaging } from "firebase-admin/messaging";
 import "dotenv/config";
-import admin from "firebase-admin";
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -18,15 +19,17 @@ const port = process.env.PORT || 5000;
 // FIREBASE ADMIN
 // ========================================
 
-admin.initializeApp({
-  credential: admin.credential.cert({
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-  }),
-});
+if (!getApps().length) {
+  initializeApp({
+    credential: cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+    }),
+  });
+}
 
-console.log("Firebase Admin initialized successfully");
+console.log("🔥 Firebase Admin initialized");
 
 // ========================================
 // MIDDLEWARE
@@ -735,7 +738,7 @@ async function run() {
 
           if (tokens.length > 0) {
             try {
-              const response = await admin.messaging().sendEachForMulticast({
+              const response = await getMessaging().sendEachForMulticast({
                 tokens,
 
                 notification: {
@@ -751,7 +754,7 @@ async function run() {
                 webpush: {
                   notification: {
                     title: "নামাজের সময় আপডেট",
-                    body: "রহমানিয়া জামে মসজিদের নামাজের সময়সূচি আপডেট করা হয়েছে। ap",
+                    body: "রহমানিয়া জামে মসজিদের নামাজের সময়সূচি আপডেট করা হয়েছে।",
                     icon: "https://rahmania-jame-mosjid.netlify.app/logo.png",
                     badge: "https://rahmania-jame-mosjid.netlify.app/logo.png",
                   },
