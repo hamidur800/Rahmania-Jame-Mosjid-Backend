@@ -1,5 +1,5 @@
 import "dotenv/config";
-
+import admin from "firebase-admin";
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -13,6 +13,20 @@ import verifyAdmin from "./middleware/verifyAdmin.js";
 const app = express();
 
 const port = process.env.PORT || 5000;
+
+// ========================================
+// FIREBASE ADMIN
+// ========================================
+
+admin.initializeApp({
+  credential: admin.credential.cert({
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+  }),
+});
+
+console.log("Firebase Admin initialized successfully");
 
 // ========================================
 // MIDDLEWARE
