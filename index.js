@@ -750,7 +750,7 @@ async function run() {
 
                 webpush: {
                   notification: {
-                    title: "🕌 নামাজের সময় আপডেট",
+                    title: "নামাজের সময় আপডেট",
                     body: "রহমানিয়া জামে মসজিদের নামাজের সময়সূচি আপডেট করা হয়েছে।",
                     icon: "https://rahmania-jame-mosjid.netlify.app/logo.png",
                     badge: "https://rahmania-jame-mosjid.netlify.app/logo.png",
@@ -768,7 +768,7 @@ async function run() {
               );
 
               // ==========================================
-              // Show individual FCM errors
+              // Individual FCM Errors
               // ==========================================
 
               response.responses.forEach((result, index) => {
@@ -794,6 +794,7 @@ async function run() {
           res.send({
             success: true,
             message: "Prayer times updated successfully",
+
             result,
 
             notification: {
@@ -812,7 +813,6 @@ async function run() {
         }
       },
     );
-
     // ========================================
     // DONATIONS
     // ========================================
