@@ -319,9 +319,43 @@ async function run() {
       }
     });
 
-    // ========================================
-    // POST USER
-    // ========================================
+    // =========================================================
+    // CHECK USER EXISTS BY EMAIL
+    // =========================================================
+    app.get("/users/check/:email", verifyToken, async (req, res) => {
+      try {
+        const email = req.params.email;
+
+        // Firebase authenticated user এবং requested email match করতে হবে
+        if (req.user.email !== email) {
+          return res.status(403).send({
+            message: "Forbidden access",
+          });
+        }
+
+        const user = await usersCollection.findOne({
+          email: email,
+        });
+
+        if (!user) {
+          return res.status(404).send({
+            exists: false,
+            message: "User not found",
+          });
+        }
+
+        res.send({
+          exists: true,
+          user,
+        });
+      } catch (error) {
+        console.error("CHECK USER ERROR:", error);
+
+        res.status(500).send({
+          message: "Failed to check user",
+        });
+      }
+    });
 
     // =========================================================
     // CREATE USER
@@ -432,44 +466,6 @@ async function run() {
 
         res.status(500).send({
           message: "Failed to create user",
-        });
-      }
-    });
-
-    // =========================================================
-    // CHECK USER EXISTS BY EMAIL
-    // =========================================================
-    app.get("/users/check/:email", verifyToken, async (req, res) => {
-      try {
-        const email = req.params.email;
-
-        // Firebase authenticated user এবং requested email match করতে হবে
-        if (req.user.email !== email) {
-          return res.status(403).send({
-            message: "Forbidden access",
-          });
-        }
-
-        const user = await usersCollection.findOne({
-          email: email,
-        });
-
-        if (!user) {
-          return res.status(404).send({
-            exists: false,
-            message: "User not found",
-          });
-        }
-
-        res.send({
-          exists: true,
-          user,
-        });
-      } catch (error) {
-        console.error("CHECK USER ERROR:", error);
-
-        res.status(500).send({
-          message: "Failed to check user",
         });
       }
     });
