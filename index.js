@@ -685,6 +685,7 @@ async function run() {
           // ==========================================
           // 1. Update Prayer Times
           // ==========================================
+
           const result = await prayerCollection.updateOne(
             {
               type: "daily",
@@ -704,6 +705,7 @@ async function run() {
           // ==========================================
           // 2. Get All Users Who Have FCM Token
           // ==========================================
+
           const users = await usersCollection
             .find({
               fcmToken: {
@@ -719,9 +721,13 @@ async function run() {
 
           const tokens = users.map((user) => user.fcmToken).filter(Boolean);
 
+          console.log("FCM Users:", users.length);
+          console.log("FCM Tokens:", tokens.length);
+
           // ==========================================
           // 3. Send Notification
           // ==========================================
+
           let notificationResult = {
             successCount: 0,
             failureCount: 0,
@@ -744,7 +750,7 @@ async function run() {
 
                 webpush: {
                   notification: {
-                    title: "নামাজের সময় আপডেট",
+                    title: "🕌 নামাজের সময় আপডেট",
                     body: "রহমানিয়া জামে মসজিদের নামাজের সময়সূচি আপডেট করা হয়েছে।",
                     icon: "https://rahmania-jame-mosjid.netlify.app/logo.png",
                     badge: "https://rahmania-jame-mosjid.netlify.app/logo.png",
@@ -760,6 +766,20 @@ async function run() {
               console.log(
                 `Prayer notification sent: ${response.successCount} successful, ${response.failureCount} failed`,
               );
+
+              // ==========================================
+              // Show individual FCM errors
+              // ==========================================
+
+              response.responses.forEach((result, index) => {
+                if (!result.success) {
+                  console.error(
+                    `FCM Error for token ${index}:`,
+                    result.error?.code,
+                    result.error?.message,
+                  );
+                }
+              });
             } catch (notificationError) {
               console.error("PRAYER NOTIFICATION ERROR:", notificationError);
             }
@@ -770,10 +790,10 @@ async function run() {
           // ==========================================
           // 4. Send Response
           // ==========================================
+
           res.send({
             success: true,
             message: "Prayer times updated successfully",
-
             result,
 
             notification: {
