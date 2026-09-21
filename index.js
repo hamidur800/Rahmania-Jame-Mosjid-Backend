@@ -729,7 +729,7 @@ async function run() {
 
           if (tokens.length > 0) {
             try {
-              const response = await getMessaging().sendEachForMulticast({
+              const response = await admin.messaging().sendEachForMulticast({
                 tokens,
 
                 notification: {
@@ -746,8 +746,8 @@ async function run() {
                   notification: {
                     title: "নামাজের সময় আপডেট",
                     body: "রহমানিয়া জামে মসজিদের নামাজের সময়সূচি আপডেট করা হয়েছে।",
-                    icon: "https://rahmania-jame-mosjid.netlify.app/logo.jpg",
-                    badge: "https://rahmania-jame-mosjid.netlify.app/logo.jpg",
+                    icon: "https://rahmania-jame-mosjid.netlify.app/logo.png",
+                    badge: "https://rahmania-jame-mosjid.netlify.app/logo.png",
                   },
                 },
               });
