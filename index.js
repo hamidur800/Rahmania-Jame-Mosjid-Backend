@@ -73,6 +73,46 @@ async function run() {
       res.send("Rahmania Jame Mosjid Server Running...");
     });
 
+    app.patch("/users/fcm-token", verifyToken, async (req, res) => {
+      try {
+        const { email, fcmToken } = req.body;
+
+        if (!email || !fcmToken) {
+          return res.status(400).send({
+            message: "Email and FCM token are required",
+          });
+        }
+
+        if (req.user.email !== email) {
+          return res.status(403).send({
+            message: "Forbidden access",
+          });
+        }
+
+        const result = await usersCollection.updateOne(
+          { email },
+          {
+            $set: {
+              fcmToken,
+              updatedAt: new Date(),
+            },
+          },
+        );
+
+        res.send({
+          success: true,
+          message: "FCM token saved successfully",
+          modifiedCount: result.modifiedCount,
+        });
+      } catch (error) {
+        console.error("SAVE FCM TOKEN ERROR:", error);
+
+        res.status(500).send({
+          message: "Failed to save FCM token",
+        });
+      }
+    });
+
     // ========================================
     // JWT ROUTE
     // ========================================
