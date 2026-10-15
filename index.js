@@ -686,13 +686,59 @@ async function run() {
           const updatedPrayerTimes = req.body;
 
           // ==========================================
-          // 1. Update Prayer Times
+          // 1. Get Previous Prayer Times
+          // ==========================================
+
+          const previousPrayerTimes = await prayerCollection.findOne({
+            type: "daily",
+          });
+
+          // ==========================================
+          // 2. Define Prayer Field Names
+          // ==========================================
+
+          const prayerLabels = {
+            fajr: "ফজর",
+            fajrTime: "ফজর",
+
+            dhuhr: "যোহর",
+            dhuhrTime: "যোহর",
+            zuhr: "যোহর",
+            zuhrTime: "যোহর",
+
+            asr: "আসর",
+            asrTime: "আসর",
+
+            maghrib: "মাগরিব",
+            maghribTime: "মাগরিব",
+
+            isha: "এশা",
+            ishaTime: "এশা",
+          };
+
+          // ==========================================
+          // 3. Detect Changed Prayer Times
+          // ==========================================
+
+          const changedPrayers = Object.entries(updatedPrayerTimes)
+            .filter(([key, newTime]) => {
+              if (!prayerLabels[key]) return false;
+
+              const oldTime = previousPrayerTimes?.[key];
+
+              return String(oldTime ?? "") !== String(newTime ?? "");
+            })
+            .map(([key, newTime]) => ({
+              name: prayerLabels[key],
+              time: String(newTime),
+            }));
+
+          // ==========================================
+          // 4. Update Prayer Times in Database
           // ==========================================
 
           const result = await prayerCollection.updateOne(
-            {
-              type: "daily",
-            },
+            { type: "daily" },
             {
               $set: {
                 ...updatedPrayerTimes,
@@ -700,13 +746,11 @@ async function run() {
                 updatedAt: new Date(),
               },
             },
-            {
-              upsert: true,
-            },
+            { upsert: true },
           );
 
           // ==========================================
-          // 2. Get All Users Who Have FCM Token
+          // 5. Get Users With FCM Tokens
           // ==========================================
 
           const users = await usersCollection
@@ -722,13 +766,19 @@ async function run() {
             })
             .toArray();
 
-          const tokens = users.map((user) => user.fcmToken).filter(Boolean);
-
-          console.log("FCM Users:", users.length);
-          console.log("FCM Tokens:", tokens.length);
+          const tokens = [
+            ...new Set(
+              users
+                .map((user) => user.fcmToken)
+                .filter(
+                  (token) =>
+                    typeof token === "string" && token.trim().length > 0,
+                ),
+            ),
+          ];
 
           // ==========================================
-          // 3. Send Notification
+          // 6. Send Notification Only If Changed
           // ==========================================
 
           let notificationResult = {
@@ -736,74 +786,92 @@ async function run() {
             failureCount: 0,
           };
 
-          if (tokens.length > 0) {
-            try {
-              const response = await getMessaging().sendEachForMulticast({
-                tokens,
+          if (changedPrayers.length > 0 && tokens.length > 0) {
+            const prayerDetails = changedPrayers
+              .map((prayer) => `${prayer.name}: ${prayer.time}`)
+              .join(" | ");
 
-                notification: {
-                  title: "নামাজের সময় আপডেট",
-                  body: "রহমানিয়া জামে মসজিদের নামাজের সময়সূচি আপডেট করা হয়েছে।",
-                },
+            const title = "নামাজের সময় আপডেট";
+            const body = `পরিবর্তিত সময়: ${prayerDetails}`;
 
-                data: {
-                  type: "prayer-time-update",
-                  message: "Prayer times have been updated",
-                },
+            for (let i = 0; i < tokens.length; i += 500) {
+              const tokenBatch = tokens.slice(i, i + 500);
 
-                webpush: {
+              try {
+                const response = await getMessaging().sendEachForMulticast({
+                  tokens: tokenBatch,
+
                   notification: {
-                    title: "নামাজের সময় আপডেট",
-                    body: "রহমানিয়া জামে মসজিদের নামাজের সময়সূচি আপডেট করা হয়েছে।",
-                    icon: "https://rahmania-jame-mosjid.netlify.app/logo.png",
-                    badge: "https://rahmania-jame-mosjid.netlify.app/logo.png",
+                    title,
+                    body,
                   },
-                },
-              });
 
-              notificationResult = {
-                successCount: response.successCount,
-                failureCount: response.failureCount,
-              };
+                  data: {
+                    type: "prayer-time-update",
+                    changedPrayers: JSON.stringify(changedPrayers),
+                    message: "Prayer times have been updated",
+                    url: "/prayer-times",
+                  },
 
-              console.log(
-                `Prayer notification sent: ${response.successCount} successful, ${response.failureCount} failed`,
-              );
+                  webpush: {
+                    notification: {
+                      title,
+                      body,
+                      icon: "https://rahmania-jame-mosjid.netlify.app/logo.png",
+                      badge:
+                        "https://rahmania-jame-mosjid.netlify.app/logo.png",
+                    },
 
-              // ==========================================
-              // Individual FCM Errors
-              // ==========================================
+                    fcmOptions: {
+                      link: "https://rahmania-jame-mosjid.netlify.app/",
+                    },
+                  },
+                });
 
-              response.responses.forEach((result, index) => {
-                if (!result.success) {
-                  console.error(
-                    `FCM Error for token ${index}:`,
-                    result.error?.code,
-                    result.error?.message,
-                  );
-                }
-              });
-            } catch (notificationError) {
-              console.error("PRAYER NOTIFICATION ERROR:", notificationError);
+                notificationResult.successCount += response.successCount;
+
+                notificationResult.failureCount += response.failureCount;
+
+                response.responses.forEach((item, index) => {
+                  if (!item.success) {
+                    console.error(
+                      `FCM error for batch token ${i + index}:`,
+                      item.error?.code,
+                      item.error?.message,
+                    );
+                  }
+                });
+              } catch (notificationError) {
+                console.error("PRAYER NOTIFICATION ERROR:", notificationError);
+
+                notificationResult.failureCount += tokenBatch.length;
+              }
             }
+
+            console.log("Prayer notification result:", notificationResult);
+          } else if (changedPrayers.length === 0) {
+            console.log(
+              "No prayer time changes detected. Notification not sent.",
+            );
           } else {
             console.log("No FCM tokens found.");
           }
 
           // ==========================================
-          // 4. Send Response
+          // 7. Send Response
           // ==========================================
 
           res.send({
             success: true,
             message: "Prayer times updated successfully",
-
             result,
+            changedPrayers,
 
             notification: {
               totalTokens: tokens.length,
               successCount: notificationResult.successCount,
               failureCount: notificationResult.failureCount,
+              sent: changedPrayers.length > 0 && tokens.length > 0,
             },
           });
         } catch (error) {
@@ -816,6 +884,7 @@ async function run() {
         }
       },
     );
+
     // ========================================
     // DONATIONS
     // ========================================
@@ -913,9 +982,7 @@ async function run() {
         // DONATION ID
         // ========================================
 
-        const targetUserId =
-          donation.userId || targetUser?._id?.toString() || "";
-
+        const targetUserId = targetUser?._id?.toString() || "";
         // ========================================
         // DONATION DATA
         // ========================================
@@ -923,46 +990,23 @@ async function run() {
         const donationToSave = {
           ...donation,
 
-          // ======================================
-          // MOST IMPORTANT
-          // Selected user's email
-          // ======================================
+          receiptNo: generateReceiptNumber(),
 
           userEmail: targetEmail,
-
           email: targetEmail,
-
           donorEmail: targetEmail,
-
-          // ======================================
-          // USER INFORMATION
-          // ======================================
 
           userId: targetUserId,
 
-          name:
-            donation.name ||
-            donation.donorName ||
-            targetUser?.name ||
-            "Unknown User",
-
+          name: targetUser?.name || donation.name || "Unknown User",
           donorName:
+            targetUser?.name ||
             donation.donorName ||
             donation.name ||
-            targetUser?.name ||
             "Unknown User",
-
-          donorPhone: donation.donorPhone || targetUser?.phone || "",
-
-          // ======================================
-          // STATUS
-          // ======================================
+          donorPhone: targetUser?.phone || donation.donorPhone || "",
 
           status: isAdmin ? "Approved" : donation.status || "Pending",
-
-          // ======================================
-          // CREATED DATE
-          // ======================================
 
           createdAt: new Date(),
         };
