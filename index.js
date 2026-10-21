@@ -1267,6 +1267,101 @@ async function run() {
       }
     });
 
+    app.get("/api/dua-categories", async (req, res) => {
+      try {
+        const buildId = "wVrcnkiQrVc0IKG8e6-_V";
+        const categories = new Map();
+        const batchSize = 20;
+        const maxDuas = 500;
+
+        for (
+          let start = 1;
+          start <= maxDuas && categories.size < 13;
+          start += batchSize
+        ) {
+          const ids = Array.from(
+            {
+              length: Math.min(batchSize, maxDuas - start + 1),
+            },
+            (_, i) => start + i,
+          );
+
+          const results = await Promise.allSettled(
+            ids.map(async (id) => {
+              const url = `https://dua.gtaf.org/_next/data/${buildId}/bn/dua/${id}.json?id=${id}`;
+
+              const response = await fetch(url, {
+                headers: {
+                  Accept: "application/json",
+                  "User-Agent": "Mozilla/5.0",
+                  Referer: "https://dua.gtaf.org/",
+                },
+                signal: AbortSignal.timeout(15000),
+              });
+
+              if (!response.ok) return null;
+
+              const result = await response.json();
+              const page = result?.pageProps;
+              const dua = page?.dua ?? page?.duaData ?? page?.data?.dua;
+
+              if (!dua || typeof dua !== "object") return null;
+
+              const rawId =
+                dua.category_id ??
+                dua.category?.id ??
+                dua.category ??
+                dua.chap_id;
+
+              const rawName =
+                dua.category_name ??
+                dua.category?.name ??
+                dua.chapname ??
+                dua.tags;
+
+              if (
+                rawId == null ||
+                typeof rawName !== "string" ||
+                !rawName.trim()
+              ) {
+                return null;
+              }
+
+              return {
+                id: String(rawId),
+                name: rawName.trim(),
+              };
+            }),
+          );
+
+          for (const result of results) {
+            if (result.status !== "fulfilled" || !result.value) {
+              continue;
+            }
+
+            const category = result.value;
+
+            if (!categories.has(category.id)) {
+              categories.set(category.id, category.name);
+            }
+          }
+        }
+
+        return res.json({
+          success: true,
+          total: categories.size,
+          categories: Array.from(categories, ([id, name]) => ({ id, name })),
+        });
+      } catch (error) {
+        console.error("Dua categories error:", error.message);
+
+        return res.status(502).json({
+          success: false,
+          message: "ক্যাটাগরি লোড করা যায়নি",
+        });
+      }
+    });
+
     // ========================================
     // SERVER STATUS
     // ========================================
