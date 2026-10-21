@@ -1219,6 +1219,54 @@ async function run() {
       }
     });
 
+    app.get("/api/dua-proxy/:id", async (req, res) => {
+      try {
+        const id = Number(req.params.id);
+
+        if (!Number.isInteger(id) || id < 1) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid dua ID",
+          });
+        }
+
+        const buildId = "wVrcnkiQrVc0IKG8e6-_V";
+
+        const url = `https://dua.gtaf.org/_next/data/${buildId}/bn/dua/${id}.json?id=${id}`;
+
+        const response = await fetch(url, {
+          headers: {
+            Accept: "application/json",
+            "User-Agent": "Mozilla/5.0",
+            Referer: "https://dua.gtaf.org/",
+          },
+          signal: AbortSignal.timeout(15000),
+        });
+
+        if (!response.ok) {
+          return res.status(502).json({
+            success: false,
+            message: "Dua source request failed",
+            upstreamStatus: response.status,
+          });
+        }
+
+        const data = await response.json();
+
+        return res.json({
+          success: true,
+          data,
+        });
+      } catch (error) {
+        console.error("Dua proxy error:", error.message);
+
+        return res.status(502).json({
+          success: false,
+          message: error.message,
+        });
+      }
+    });
+
     // ========================================
     // SERVER STATUS
     // ========================================
