@@ -1035,9 +1035,9 @@ async function run() {
       } catch (error) {
         console.error("Donation POST Error:", error);
 
-        res.status(500).send({
+        return res.status(500).send({
           success: false,
-          message: "Failed to create donation",
+          message: error.message,
         });
       }
     });
