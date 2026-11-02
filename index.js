@@ -897,9 +897,12 @@ async function run() {
 
     app.post("/donations", verifyToken, async (req, res) => {
       try {
-        const donation = req.body || {};
+        const donation = req.body;
 
-        // 1. Authenticated user
+        // ========================================
+        // AUTHENTICATED USER
+        // ========================================
+
         const authenticatedEmail = req.user?.email;
 
         if (!authenticatedEmail) {
@@ -909,7 +912,10 @@ async function run() {
           });
         }
 
-        // 2. Find authenticated user
+        // ========================================
+        // FIND AUTHENTICATED USER
+        // ========================================
+
         const authenticatedUser = await usersCollection.findOne({
           email: authenticatedEmail,
         });
@@ -921,97 +927,115 @@ async function run() {
           });
         }
 
-        // 3. Check admin
+        // ========================================
+        // CHECK ADMIN
+        // ========================================
+
         const isAdmin = authenticatedUser.role === "admin";
 
-        // 4. Target email
-        const targetEmail = isAdmin
-          ? donation.userEmail ||
-            donation.donorEmail ||
-            donation.email ||
-            authenticatedEmail
-          : authenticatedEmail;
+        // ========================================
+        // TARGET USER EMAIL
+        // ========================================
 
-        // Normal user cannot create donation for another user
-        if (
-          !isAdmin &&
-          (donation.userEmail || donation.donorEmail || donation.email) &&
-          (donation.userEmail || donation.donorEmail || donation.email) !==
-            authenticatedEmail
-        ) {
-          return res.status(403).send({
-            success: false,
-            message: "You can only create donation for your own account",
+        const targetEmail =
+          donation.userEmail ||
+          donation.donorEmail ||
+          donation.email ||
+          authenticatedEmail;
+
+        // ========================================
+        // NORMAL USER
+        // ========================================
+
+        if (!isAdmin) {
+          // Normal user অন্য user-এর নামে donation
+          // create করতে পারবে না
+
+          if (targetEmail !== authenticatedEmail) {
+            return res.status(403).send({
+              success: false,
+              message: "You can only create donation for your own account",
+            });
+          }
+        }
+
+        // ========================================
+        // TARGET USER
+        // ========================================
+
+        let targetUser = authenticatedUser;
+
+        if (isAdmin) {
+          targetUser = await usersCollection.findOne({
+            email: targetEmail,
           });
+
+          if (!targetUser) {
+            return res.status(404).send({
+              success: false,
+              message: "Selected user not found",
+            });
+          }
         }
 
-        // 5. Find target user
-        const targetUser = isAdmin
-          ? await usersCollection.findOne({
-              email: targetEmail,
-            })
-          : authenticatedUser;
+        // ========================================
+        // DONATION ID
+        // ========================================
 
-        if (!targetUser) {
-          return res.status(404).send({
-            success: false,
-            message: "Selected user not found",
-          });
-        }
+        const targetUserId = targetUser?._id?.toString() || "";
+        // ========================================
+        // DONATION DATA
+        // ========================================
 
-        // 6. Generate receipt number
-        const receiptNo = generateReceiptNumber();
-
-        if (!receiptNo) {
-          throw new Error("Receipt number generation failed");
-        }
-
-        // 7. Prepare donation
         const donationToSave = {
           ...donation,
 
-          receiptNo,
+          receiptNo: generateReceiptNumber(),
 
           userEmail: targetEmail,
-          donorEmail: targetEmail,
           email: targetEmail,
+          donorEmail: targetEmail,
 
-          userId: targetUser._id.toString(),
+          userId: targetUserId,
 
-          name: targetUser.name || donation.name || "Unknown User",
-
+          name: targetUser?.name || donation.name || "Unknown User",
           donorName:
-            targetUser.name ||
+            targetUser?.name ||
             donation.donorName ||
             donation.name ||
             "Unknown User",
+          donorPhone: targetUser?.phone || donation.donorPhone || "",
 
-          donorPhone: targetUser.phone || donation.donorPhone || "",
-
-          // Only admin-created donations are approved automatically
-          status: isAdmin ? "Approved" : "Pending",
+          status: isAdmin ? "Approved" : donation.status || "Pending",
 
           createdAt: new Date(),
         };
 
         console.log("FINAL DONATION TO SAVE:", donationToSave);
 
-        // 8. Save to MongoDB
+        // ========================================
+        // SAVE
+        // ========================================
+
         const result = await donationsCollection.insertOne(donationToSave);
 
-        // 9. Response
-        return res.status(201).send({
+        // ========================================
+        // RESPONSE
+        // ========================================
+
+        res.status(201).send({
           success: true,
+
           message: isAdmin
             ? "Donation created successfully for selected user"
             : "Donation submitted successfully",
+
           insertedId: result.insertedId,
-          receiptNo,
         });
       } catch (error) {
         console.error("Donation POST Error:", error);
 
-        return res.status(500).send({
+        res.status(500).send({
           success: false,
           message: "Failed to create donation",
         });
